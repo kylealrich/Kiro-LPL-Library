@@ -3,10 +3,15 @@
   "enabled": true,
   "name": "Sync and Commit",
   "when": {
-    "type": "postTaskExecution"
+    "type": "fileEdited",
+    "patterns": [
+      "Kiro-LPL-Library\\knowledge-base"
+    ]
   },
   "then": {
     "type": "askAgent",
     "prompt": "Sync and commit to the .git repository."
-  }
+  },
+  "workspaceFolderName": "Kiro-LPL-Library",
+  "shortName": "sync-and-commit"
 }

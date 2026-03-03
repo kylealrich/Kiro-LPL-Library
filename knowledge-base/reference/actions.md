@@ -977,6 +977,269 @@ UpdateRevisionsAndIssueMethodFlag is an Instance Action
             else
             if (PurchasingVendorRel.RevisionsInclude entered)
                 RevisionsInclude = PurchasingVendorRel.RevisionsInclude
+```
+
+### Example 11: RepSetBC - Multi-Threading Pattern with ReplicateLoop
+
+From the RepSetBC business class, demonstrating a sophisticated multi-threading pattern for parallel data processing:
+
+```
+ReplicateLoop is an Instance Action
+    run in background
+    restricted
+    valid when (ReplicationSet.InProcess)
+    
+    Queue Mapping Fields
+        ReplicationSet
+        BusinessClass
+    
+    Local Fields
+        ReplLocalThreadNum	is Numeric size 2
+        LocalRequestId  is UniqueID
+        LocalBackgroundGroup is AlphaUpper size 34
+    
+    Entrance Rules
+        invoke LockReplicateLoop
+        
+    Action Rules
+        ReplLocalThreadNum = 0
+        LocalBackgroundGroup = ReplicationSet + RepSetBC
+    
+        if (MultiThreadFullReplications
+        and (not IncrementalReplication 
+        or   DisableIncrementalReplication 
+        or   not ReplicationSet.LastRefreshStamp entered))
+            invoke Create RepSetBCHistory	
+                invoked.ReplicationSet 				 = ReplicationSet
+                invoked.RepSetBC 					 = RepSetBC
+                invoked.RepSetBCHistory.Backfill 	 = 0 
+                invoked.RepSetBCHistory.HistoryStamp = ReplicationSet.AdjustedCurrentRefreshStamp 
+
+            initialize MultiThreadSchemaBuilt
+
+            while (ReplLocalThreadNum < MultiThreadNumThreads)
+                invoke Replicate in background group (LocalBackgroundGroup)
+                    invoked.PrmThreadNum = ReplLocalThreadNum
+                ReplLocalThreadNum = ReplLocalThreadNum + 1
+                
+            invoke SetFinished in background group (ReplicationSet)
+                run after background group (LocalBackgroundGroup)
+        else
+            invoke Replicate in background group (ReplicationSet)
+                invoked.PrmThreadNum = -1
+```
+
+This example demonstrates:
+- **Multi-threading coordinator pattern**: Spawns multiple worker threads
+- **Background groups**: Coordinating parallel execution
+- **while loop**: Iterating to create multiple threads
+- **Thread numbering**: Passing unique thread numbers (0, 1, 2, ...)
+- **run after background group**: Scheduling cleanup after all threads complete
+- **Locking mechanism**: Preventing duplicate execution
+- **Conditional multi-threading**: Only multi-threads for full replications
+- **Single-threaded fallback**: Uses PrmThreadNum = -1 for single thread
+
+### Example 12: RepSetBC - Worker Thread Action
+
+From the RepSetBC business class, demonstrating the worker thread action that processes partitioned data:
+
+```
+Replicate is an Instance Action 
+    run in background
+    restricted
+    valid when (ReplicationSet.InProcess)
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Queue Mapping Fields
+        ReplicationSet
+        BusinessClass
+    
+    Entrance Rules
+        constraint (not SynchronizeRecordCountLocked)
+            "A_'SynchronizeRecordCount'_isInProcess.ReplicationCannotRunUntilComplete."
+        invoke LockReplicateThread 
+            invoked.PrmThreadNum = PrmThreadNum
+            
+        if (DisableIncrementalReplication and ExpectedNumberOfRecordsIsValid) 
+            initialize ExpectedNumberOfRecords
+        
+        LocalStarted = system current timestamp
+        
+        if (not Inactive
+        and ColumnarFlattenHierarchy
+        and (PrmThreadNum = -1
+        or   PrmThreadNum = 0)
+        and (AlwaysRebuild
+        or   not IncrementalReplication 
+        or   DisableIncrementalReplication 
+        or   not ReplicationSet.LastRefreshStamp entered))
+            invoke ReplicateFlattenedHierarchy in background group (ReplicationSet)
+        
+    Exit Rules
+        NonHistoricalChangeOptimizationEligible = LocalNonHistChangeOptEligible
+        
+        if (ExpectedNumberOfRecordsIsValid)
+            ExpectedNumberOfRecords = ExpectedNumberOfRecords + LocalNumberCreated + LocalBackFillUpdateAsDelete - LocalNumberDeleted
+                
+        if (ReplicationSet.CurrentRefreshStamp entered 
+        and (ReplicationSet.MaintainHistoryCount > 0
+        or   LocalReplicationWarnings entered))
+            if (PrmThreadNum = -1)
+                if (not RepSetBCHistoryInstance exists) 
+                    invoke Create RepSetBCHistory				
+                        invoked.ReplicationSet 				 = ReplicationSet
+                        invoked.RepSetBC 					 = RepSetBC
+                        invoked.RepSetBCHistory.Backfill 	 = 0 
+                        invoked.RepSetBCHistory.HistoryStamp = ReplicationSet.AdjustedCurrentRefreshStamp 
+                        invoked.RecordCount					 = LocalRecordCount 
+                        invoked.Segments		 	 		 = LocalSegments    
+                        invoked.Started						 = LocalStarted     
+                        invoked.NumberCreated				 = LocalNumberCreated 
+                        invoked.NumberUpdated				 = LocalNumberUpdated 
+                        invoked.NumberDeleted				 = LocalNumberDeleted 
+                        invoked.BackfillUpdateCreates		 = LocalBackFillUpdateAsDelete 
+                        invoked.Finished					 = LocalFinished    
+                        invoked.ReplicationWarnings			 = LocalReplicationWarnings 
+                        
+                        if (ExpectedNumberOfRecordsIsValid)
+                            invoked.ExpectedNumberOfRecords	 = ExpectedNumberOfRecords
+                else
+                    invoke Update RepSetBCHistoryInstance
+                        invoked.RecordCount				= LocalRecordCount 
+                        invoked.Segments				= LocalSegments    
+                        invoked.NumberCreated			= LocalNumberCreated 
+                        invoked.NumberUpdated			= LocalNumberUpdated 
+                        invoked.NumberDeleted			= LocalNumberDeleted 
+                        invoked.BackfillUpdateCreates	= LocalBackFillUpdateAsDelete 
+                        invoked.Started					= LocalStarted     
+                        invoked.Finished				= LocalFinished    
+                        invoked.ReplicationWarnings		= LocalReplicationWarnings 
+                        
+                        if (ExpectedNumberOfRecordsIsValid)
+                            invoked.ExpectedNumberOfRecords	 = ExpectedNumberOfRecords
+            else
+                if (RepSetBCHistoryInstance exists) 
+                    invoke UpdateForLoop RepSetBCHistoryInstance
+                        invoked.PrmRecordCount				= LocalRecordCount 
+                        invoked.PrmSegments					= LocalSegments	   
+                        invoked.PrmNumberCreated			= LocalNumberCreated 
+                        invoked.PrmNumberUpdated			= LocalNumberUpdated 
+                        invoked.PrmNumberDeleted			= LocalNumberDeleted 
+                        invoked.PrmBackfillUpdateCreates	= LocalBackFillUpdateAsDelete 
+                        invoked.PrmStarted					= LocalStarted	   
+                        invoked.PrmReplicationWarnings 		= LocalReplicationWarnings 
+                        
+                        if (ExpectedNumberOfRecordsIsValid)
+                            invoked.PrmExpectedNumberOfRecords = LocalNumberCreated + LocalBackFillUpdateAsDelete - LocalNumberDeleted
+        
+        invoke UnlockReplicateThread
+            invoked.PrmThreadNum = PrmThreadNum
+```
+
+This example demonstrates:
+- **Thread parameter**: Receives thread number from coordinator
+- **Thread-specific locking**: Each thread locks with its unique number
+- **Thread-specific processing**: PrmThreadNum = -1 for single thread, >= 0 for multi-thread
+- **Conditional history updates**: Different logic for single vs multi-threaded
+- **Accumulator updates**: Aggregating results from thread execution
+- **Automatic unlock**: Releasing thread lock in Exit Rules
+- **Constraint validation**: Preventing conflicts with other operations
+- **Timestamp tracking**: Recording start time for performance monitoring
+
+### Example 13: RepSetBC - Thread Locking Actions
+
+From the RepSetBC business class, demonstrating the locking mechanism for multi-threading:
+
+```
+LockReplicateLoop is an Instance Action 
+    restricted                          
+    
+    Entrance Rules
+        constraint (not ReplicateLoopLocked)
+            "ReplicationSet<ReplicationSet>,Sequence<RepSetBC>,BusinessClass<BusinessClass>,ReplicateClassName<ReplicateClassName>ReplicateLoopIsAlreadyLocked.ThisPotentiallyIndicatesADuplicateThread."
+
+UnlockReplicateLoop is an Instance Action
+    restricted	
+
+ForceUnlockReplicateLoop is an Instance Action
+    valid when (ReplicateLoopLocked)
+    confirmation required
+        "ReplicateLoopShouldOnlyBeUnlockedIfYouAreCertainItIsNotActivelyProcessing.AreYouSure?"
+    
+    Action Rules
+        invoke UnlockReplicateLoop
+
+LockReplicateThread is an Instance Action 
+    restricted
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Entrance Rules
+        if (PrmThreadNum < 0)
+            LocalThreadNum = 0
+        else
+            LocalThreadNum = PrmThreadNum
+        
+        constraint (not ReplicateThreadLocked)
+            "ReplicationSet<ReplicationSet>,Sequence<RepSetBC>,BusinessClass<BusinessClass>,ReplicateClassName<ReplicateClassName>ReplicateThread<LocalThreadNum>IsAlreadyLocked.ThisPotentiallyIndicatesADuplicateThread."
+    
+    Exit Rules
+        LocalThreadNum = -1
+
+UnlockReplicateThread is an Instance Action
+    restricted	
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Entrance Rules
+        if (PrmThreadNum < 0)
+            LocalThreadNum = 0
+        else
+            LocalThreadNum = PrmThreadNum
+    
+    Exit Rules
+        LocalThreadNum = -1
+
+UnlockAllReplicateThreads is an Instance Action
+    restricted	
+    
+    Parameters
+        WasIncremental is Boolean
+            default label is "Incremental"
+    
+    Local Fields
+        ReplLocalThreadNum	is Numeric size 2
+        
+    Action Rules
+        ReplLocalThreadNum = 0
+        
+        if (MultiThreadFullReplications and (DisableIncrementalReplication or not IncrementalReplication or not WasIncremental))
+            while (ReplLocalThreadNum < MultiThreadNumThreads)
+                invoke UnlockReplicateThread
+                    invoked.PrmThreadNum = ReplLocalThreadNum
+                ReplLocalThreadNum = ReplLocalThreadNum + 1
+        else
+            invoke UnlockReplicateThread
+                invoked.PrmThreadNum = 0
+```
+
+This example demonstrates:
+- **Loop-level locking**: Prevents duplicate coordinator execution
+- **Thread-level locking**: Prevents duplicate worker thread execution
+- **Native field locks**: Uses NativeField for connection-level locking
+- **Constraint-based locking**: Prevents action execution if already locked
+- **Force unlock**: Manual override for stuck locks
+- **Bulk unlock**: Unlocking all threads at once
+- **Thread number normalization**: Converting -1 to 0 for single-threaded mode
+- **Safety valve pattern**: Automatic lock release at end of work
+- **LocalThreadNum pattern**: Using local field to track thread contextendorRel.RevisionsInclude
             else
             if (Company.RevisionsInclude entered)
                 RevisionsInclude = Company.RevisionsInclude

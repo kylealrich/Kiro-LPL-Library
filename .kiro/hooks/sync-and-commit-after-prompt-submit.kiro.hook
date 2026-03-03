@@ -7,6 +7,8 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Sync and commit to the .git repository."
-  }
+    "prompt": "If there is something to commit, sync and commit to the .git repository."
+  },
+  "workspaceFolderName": "Kiro-LPL-Library",
+  "shortName": "sync-and-commit-after-prompt-submit"
 }
