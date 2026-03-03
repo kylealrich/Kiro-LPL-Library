@@ -1,0 +1,123 @@
+User is a BusinessClass
+	owned by System
+	sql name is USER
+	default label is untranslatable
+	
+	representative text is "<UserID> - <UserName>"
+	
+	Persistent Fields
+		UserID is Alpha size 20
+			default label is untranslatable
+			text searchable
+		
+		UserName is Alpha size 100
+			default label is untranslatable
+			text searchable
+			holds pii
+		
+		Email is Alpha size 255
+			default label is untranslatable:"Email_Address"
+			text searchable
+			holds pii
+		
+		Active is Boolean
+			default label is untranslatable
+			default value is true
+		
+		CreatedDate is TimeStamp
+			default label is untranslatable
+			protected
+		
+		CreatedBy is Alpha size 20
+			default label is untranslatable
+			protected
+			holds pii
+		
+		LastUpdateDate is TimeStamp
+			default label is untranslatable
+			protected
+		
+		LastUpdateBy is Alpha size 20
+			default label is untranslatable
+			protected
+			holds pii
+	
+	Field Rules
+		UserID
+			required
+				untranslatable:"User_ID_is_required"
+		
+		UserName
+			required
+				untranslatable:"User_Name_is_required"
+		
+		Email
+			required
+				untranslatable:"Email_Address_is_required"
+	
+	Commit Rules
+		constraint (UserID entered)
+			untranslatable:"User_ID_must_be_entered"
+		
+		constraint (UserName entered)
+			untranslatable:"User_Name_must_be_entered"
+	
+	Actions
+		Create is a Create Action
+			default label is untranslatable:"Create_User"
+			completion message is untranslatable:"User_<UserID>_created_successfully"
+			
+			Parameters
+				PrmUserID is Alpha size 20
+					default label is untranslatable:"User_ID"
+				PrmUserName is Alpha size 100
+					default label is untranslatable:"User_Name"
+				PrmEmail is Alpha size 255
+					default label is untranslatable:"Email_Address"
+				PrmActive is Boolean
+					default label is untranslatable
+			
+			Parameter Rules
+				PrmUserID
+					required
+						untranslatable:"User_ID_is_required"
+				
+				PrmUserName
+					required
+						untranslatable:"User_Name_is_required"
+				
+				PrmEmail
+					required
+						untranslatable:"Email_Address_is_required"
+				
+				PrmActive
+					initial value is true
+					default to true
+			
+			Action Rules
+				UserID = PrmUserID
+				UserName = PrmUserName
+				Email = PrmEmail
+				Active = PrmActive
+				CreatedDate = current timestamp
+				CreatedBy = current user
+				LastUpdateDate = current timestamp
+				LastUpdateBy = current user
+		
+		Update is an Update Action
+			default label is untranslatable:"Update_User"
+			completion message is untranslatable:"User_<UserID>_updated_successfully"
+			
+			Action Rules
+				LastUpdateDate = current timestamp
+				LastUpdateBy = current user
+		
+		Purge is a Purge Action
+			default label is untranslatable:"Purge_User"
+			completion message is untranslatable:"User_<UserID>_purged_successfully"
+			confirmation required
+				untranslatable:"Are_you_sure_you_want_to_permanently_delete_this_user_This_action_cannot_be_undone"
+			
+			Action Rules
+				constraint (Active = false)
+					untranslatable:"Cannot_purge_an_active_user_Please_deactivate_the_user_first"

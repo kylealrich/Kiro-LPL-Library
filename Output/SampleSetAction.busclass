@@ -1,0 +1,293 @@
+// Sample Set Action - Process Pending Invoices
+// This demonstrates a comprehensive Set Action with various features
+// Generated from LPL reference documentation
+
+Invoice is a BusinessClass
+	owned by FinanceModule
+	sql name is INVOICE
+	default label is "Invoice"
+	prefix is INV
+	classic name is INVOICE
+	representative text is "Invoice <InvoiceNumber>"
+
+	Persistent Fields
+		INVOICENUMBER is AlphaUpper size 20
+			required
+			default label is "Invoice Number"
+			
+		COMPANY is a Company
+			required
+			default label is "Company"
+			
+		CUSTOMER is a Customer
+			required
+			default label is "Customer"
+			
+		INVOICEDATE is Date
+			required
+			default label is "Invoice Date"
+			
+		DUEDATE is Date
+			required
+			default label is "Due Date"
+			
+		SUBTOTAL is Decimal size 15.2
+			default label is "Subtotal"
+			
+		TAXAMOUNT is Decimal size 15.2
+			default label is "Tax Amount"
+			
+		TOTALAMOUNT is Decimal size 15.2
+			default label is "Total Amount"
+			
+		STATUS is Alpha size 20
+			default label is "Status"
+			States
+				Draft			value is "DRAFT"
+				Pending			value is "PENDING"
+				Approved		value is "APPROVED"
+				Posted			value is "POSTED"
+				Paid			value is "PAID"
+				Cancelled		value is "CANCELLED"
+				
+		PRIORITY is Alpha size 10
+			default label is "Priority"
+			States
+				Low				value is "LOW"
+				Normal			value is "NORMAL"
+				High			value is "HIGH"
+				Urgent			value is "URGENT"
+				
+		APPROVEDBY is an Employee
+			default label is "Approved By"
+			
+		APPROVALDATE is Date
+			default label is "Approval Date"
+			
+		PROCESSEDBY is an Employee
+			default label is "Processed By"
+			
+		PROCESSEDDATE is Date
+			default label is "Processed Date"
+			
+		ERRORMESSAGE is Alpha size 255
+			default label is "Error Message"
+			
+		BATCHID is Alpha size 50
+			default label is "Batch ID"
+
+	Relations
+		CompanyRel is a Relation
+			to Company
+			using Company
+			
+		CustomerRel is a Relation
+			to Customer
+			using Customer
+
+	Actions
+		// Standard Create Action
+		Create is an Action
+		
+		// Standard Update Action
+		Update is an Action
+		
+		// Standard Delete Action
+		Delete is an Action
+		
+		// Set Action: Process Pending Invoices in Batch
+		ProcessPendingInvoices is a Set Action
+			default label is "Process Pending Invoices"
+			completion message is "Successfully processed <POCounter> invoices in batch <LocalBatchID>"
+			no records message is "No pending invoices found matching the criteria"
+			run in background
+			allow unlimited concurrency
+			
+			// Local variables for processing
+			Local Fields
+				LocalBatchID is Alpha size 50
+				LocalProcessedCount is Numeric 9
+				LocalErrorCount is Numeric 9
+				LocalCurrentUser is an Employee
+				LocalProcessDate is Date
+				LocalHasError is Boolean
+				LocalErrorMessage is Alpha size 255
+				LocalTotalAmount is Decimal size 15.2
+				
+			// Parameters for filtering
+			Parameters
+				PrmCompany is a Company
+					default label is "Company"
+					
+				PrmCustomer is a Customer
+					default label is "Customer"
+					
+				PrmPriority is like PRIORITY
+					default label is "Priority"
+					
+				PrmInvoiceDateFrom is Date
+					default label is "Invoice Date From"
+					
+				PrmInvoiceDateTo is Date
+					default label is "Invoice Date To"
+					
+				PrmMinAmount is Decimal size 15.2
+					default label is "Minimum Amount"
+					
+				PrmMaxAmount is Decimal size 15.2
+					default label is "Maximum Amount"
+					
+				PrmAutoApprove is Boolean
+					default label is "Auto Approve"
+					
+			// Parameter validation
+			Parameter Rules
+				PrmCompany
+					required
+						"Company is required for batch processing"
+				
+				PrmInvoiceDateFrom
+					constraint (PrmInvoiceDateFrom <= current corporate date)
+						"Invoice date from cannot be in the future"
+				
+				PrmInvoiceDateTo
+					constraint (PrmInvoiceDateTo >= PrmInvoiceDateFrom)
+						"Invoice date to must be greater than or equal to invoice date from"
+					default to current corporate date
+				
+				PrmMinAmount
+					constraint (PrmMinAmount >= 0)
+						"Minimum amount cannot be negative"
+					default to 0
+				
+				PrmMaxAmount
+					constraint (PrmMaxAmount >= PrmMinAmount)
+						"Maximum amount must be greater than or equal to minimum amount"
+				
+				PrmAutoApprove
+					default to false
+			
+			// Define which invoices to process
+			Instance Selection
+				where (Company = PrmCompany
+				and    Status = Status.Pending
+				and   (PrmCustomer not entered
+				or     Customer = PrmCustomer)
+				and   (PrmPriority not entered
+				or     Priority = PrmPriority)
+				and   (PrmInvoiceDateFrom not entered
+				or     InvoiceDate >= PrmInvoiceDateFrom)
+				and   (PrmInvoiceDateTo not entered
+				or     InvoiceDate <= PrmInvoiceDateTo)
+				and   (PrmMinAmount not entered
+				or     TotalAmount >= PrmMinAmount)
+				and   (PrmMaxAmount not entered
+				or     TotalAmount <= PrmMaxAmount))
+			
+			// Process in priority order, then by date
+			Sort Order
+				Priority descending
+				InvoiceDate
+				InvoiceNumber
+			
+			// Accumulators for tracking
+			Accumulators
+				POCounter
+				TotalAmountAccumulator
+			
+			// Action processing rules
+			Action Rules
+				// Set-level entrance rules (run once at start)
+				Set Rules
+					Entrance Rules
+						// Generate unique batch ID
+						LocalBatchID = "BATCH_" + current timestamp
+						LocalProcessDate = current corporate date
+						LocalCurrentUser = current user
+						LocalProcessedCount = 0
+						LocalErrorCount = 0
+						LocalTotalAmount = 0
+						
+						// Log batch start
+						log "Starting invoice batch processing: " + LocalBatchID
+						log "Company: " + PrmCompany.CompanyName
+						log "Date range: " + PrmInvoiceDateFrom + " to " + PrmInvoiceDateTo
+						
+					// Set-level exit rules (run once at end)
+					Exit Rules
+						// Log batch completion
+						log "Batch processing completed: " + LocalBatchID
+						log "Total invoices processed: " + LocalProcessedCount
+						log "Total errors: " + LocalErrorCount
+						log "Total amount: " + LocalTotalAmount
+						
+						// Send notification if errors occurred
+						if (LocalErrorCount > 0)
+							log "WARNING: " + LocalErrorCount + " invoices failed processing"
+				
+				// Priority-specific rules (run when priority changes)
+				Priority Set Rules
+					Entrance Rules
+						log "Processing priority group: " + Priority
+					
+					Exit Rules
+						log "Completed priority group: " + Priority
+				
+				// Instance-level rules (run for each invoice)
+				Instance Rules
+					// Initialize error tracking
+					LocalHasError = false
+					LocalErrorMessage = blank
+					
+					// Validate invoice data
+					constraint (Subtotal > 0)
+						LocalHasError = true
+						LocalErrorMessage = "Subtotal must be greater than zero"
+					
+					constraint (TotalAmount = Subtotal + TaxAmount)
+						LocalHasError = true
+						LocalErrorMessage = "Total amount does not match subtotal plus tax"
+					
+					constraint (DueDate >= InvoiceDate)
+						LocalHasError = true
+						LocalErrorMessage = "Due date cannot be before invoice date"
+					
+					constraint (CustomerRel exists)
+						LocalHasError = true
+						LocalErrorMessage = "Customer record not found"
+					
+					// Process if no errors
+					if (not LocalHasError)
+						// Update batch tracking
+						BatchID = LocalBatchID
+						ProcessedDate = LocalProcessDate
+						ProcessedBy = LocalCurrentUser
+						
+						// Auto-approve if requested and amount is within limit
+						if (PrmAutoApprove and TotalAmount <= 10000)
+							Status = Status.Approved
+							ApprovedBy = LocalCurrentUser
+							ApprovalDate = LocalProcessDate
+							log "Auto-approved invoice: " + InvoiceNumber
+						else
+							Status = Status.Approved
+							log "Processed invoice: " + InvoiceNumber
+						
+						// Update counters
+						LocalProcessedCount = LocalProcessedCount + 1
+						LocalTotalAmount = LocalTotalAmount + TotalAmount
+						POCounter = POCounter + 1
+						TotalAmountAccumulator = TotalAmountAccumulator + TotalAmount
+						
+						// Clear any previous error message
+						ErrorMessage = blank
+					else
+						// Record error
+						ErrorMessage = LocalErrorMessage
+						LocalErrorCount = LocalErrorCount + 1
+						log "ERROR processing invoice " + InvoiceNumber + ": " + LocalErrorMessage
+				
+				// Rules when no invoices found
+				Empty Set Rules
+					log "No pending invoices found for company: " + PrmCompany.CompanyName
+					log "Date range: " + PrmInvoiceDateFrom + " to " + PrmInvoiceDateTo
