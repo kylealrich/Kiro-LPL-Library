@@ -1,0 +1,171 @@
+SimpleProduct is a BusinessClass
+	owned by UserDefined
+	sql name is SIMPLE_PRODUCT
+	default label is untranslatable:"Simple_Product"
+	
+	representative text is "<PRODUCT_CODE> - <PRODUCT_NAME>"
+	
+	Persistent Fields
+		PRODUCT_CODE is Alpha size 20
+			default label is untranslatable:"Product_Code"
+			text searchable
+		
+		PRODUCT_NAME is Alpha size 100
+			default label is untranslatable:"Product_Name"
+			text searchable
+		
+		DESCRIPTION is Alpha size 500
+			default label is untranslatable
+			text searchable
+		
+		UNIT_PRICE is Numeric size 15 decimals 2
+			default label is untranslatable:"Unit_Price"
+		
+		ACTIVE_FLAG is Alpha size 1
+			default label is untranslatable:"Active_Flag"
+			default value is "Y"
+	
+	Field Rules
+		PRODUCT_CODE
+			required
+				untranslatable:"Product_Code_is_required"
+		
+		PRODUCT_NAME
+			required
+				untranslatable:"Product_Name_is_required"
+		
+		UNIT_PRICE
+			required
+				untranslatable:"Unit_Price_is_required"
+			
+			constraint is UNIT_PRICE >= 0
+				untranslatable:"Unit_Price_must_be_zero_or_greater"
+		
+		ACTIVE_FLAG
+			constraint is ACTIVE_FLAG in ["Y", "N"]
+				untranslatable:"Active_Flag_must_be_Y_or_N"
+	
+	Actions
+		Create is a Create Action
+			default label is untranslatable
+			completion message is untranslatable:"Product_<PRODUCT_CODE>_created_successfully"
+			
+			Parameters
+				PrmProductCode is Alpha size 20
+					default label is untranslatable:"Product_Code"
+				
+				PrmProductName is Alpha size 100
+					default label is untranslatable:"Product_Name"
+				
+				PrmDescription is Alpha size 500
+					default label is untranslatable
+				
+				PrmUnitPrice is Numeric size 15 decimals 2
+					default label is untranslatable:"Unit_Price"
+			
+			Parameter Rules
+				PrmProductCode
+					required
+						untranslatable:"Product_Code_is_required"
+				
+				PrmProductName
+					required
+						untranslatable:"Product_Name_is_required"
+				
+				PrmUnitPrice
+					required
+						untranslatable:"Unit_Price_is_required"
+					
+					constraint is PrmUnitPrice >= 0
+						untranslatable:"Unit_Price_must_be_zero_or_greater"
+			
+			Action Rules
+				PRODUCT_CODE = PrmProductCode
+				PRODUCT_NAME = PrmProductName
+				DESCRIPTION = PrmDescription
+				UNIT_PRICE = PrmUnitPrice
+		
+		Update is an Update Action
+			default label is untranslatable
+			completion message is untranslatable:"Product_<PRODUCT_CODE>_updated_successfully"
+			
+			Parameters
+				PrmProductName is Alpha size 100
+					default label is untranslatable:"Product_Name"
+				
+				PrmDescription is Alpha size 500
+					default label is untranslatable
+				
+				PrmUnitPrice is Numeric size 15 decimals 2
+					default label is untranslatable:"Unit_Price"
+				
+				PrmActiveFlag is Alpha size 1
+					default label is untranslatable:"Active_Flag"
+			
+			Parameter Rules
+				PrmProductName
+					required
+						untranslatable:"Product_Name_is_required"
+				
+				PrmUnitPrice
+					required
+						untranslatable:"Unit_Price_is_required"
+					
+					constraint is PrmUnitPrice >= 0
+						untranslatable:"Unit_Price_must_be_zero_or_greater"
+				
+				PrmActiveFlag
+					constraint is PrmActiveFlag in ["Y", "N"]
+						untranslatable:"Active_Flag_must_be_Y_or_N"
+			
+			Action Rules
+				PRODUCT_NAME = PrmProductName
+				DESCRIPTION = PrmDescription
+				UNIT_PRICE = PrmUnitPrice
+				ACTIVE_FLAG = PrmActiveFlag
+		
+		Delete is a Delete Action
+			default label is untranslatable
+			completion message is untranslatable:"Product_<PRODUCT_CODE>_deleted_successfully"
+		
+		SetPrice is a Set Action
+			default label is untranslatable:"Set_Price"
+			completion message is untranslatable:"Price_updated_to_<PrmNewPrice>_for_<PRODUCT_CODE>"
+			
+			Parameters
+				PrmNewPrice is Numeric size 15 decimals 2
+					default label is untranslatable:"New_Price"
+			
+			Parameter Rules
+				PrmNewPrice
+					required
+						untranslatable:"New_Price_is_required"
+					
+					constraint is PrmNewPrice >= 0
+						untranslatable:"Price_must_be_zero_or_greater"
+			
+			Action Rules
+				UNIT_PRICE = PrmNewPrice
+		
+		ApplyDiscount is an Instance Action
+			default label is untranslatable:"Apply_Discount"
+			completion message is untranslatable:"Discount_of_<PrmDiscountPercent>%_applied_to_<PRODUCT_CODE>"
+			
+			Parameters
+				PrmDiscountPercent is Numeric size 5 decimals 2
+					default label is untranslatable:"Discount_Percent"
+			
+			Local Fields
+				NewPrice is Numeric size 15 decimals 2
+			
+			Parameter Rules
+				PrmDiscountPercent
+					required
+						untranslatable:"Discount_Percent_is_required"
+					
+					constraint is PrmDiscountPercent > 0 and PrmDiscountPercent <= 100
+						untranslatable:"Discount_must_be_between_0_and_100_percent"
+			
+			Action Rules
+				NewPrice = UNIT_PRICE * (1 - (PrmDiscountPercent / 100))
+				UNIT_PRICE = NewPrice

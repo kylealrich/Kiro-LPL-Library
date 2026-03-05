@@ -1685,7 +1685,51 @@ This example demonstrates:
 - **restricted**: Action only callable from other actions
 - **view**: Using view variables to capture created instances
 - **Instance Selection**: Filtering records for set processing
-- **Instance Rules**: Rules executed for each instance in the set
+- **Instance Rules**: Rules executed for each instance
+- **fill in fields from**: Copying fields from source record
+- **except**: Excluding specific fields from copy
+- **for each**: Iterating over related records to copy them
+- **Nested invokes**: Creating related records within action
+
+### Example: SimpleProduct - Instance Action with Discount Calculation
+
+From the SimpleProduct business class, demonstrating an instance action with parameter validation and local field calculations:
+
+```
+ApplyDiscount is an Instance Action
+	default label is untranslatable:"Apply_Discount"
+	completion message is untranslatable:"Discount_of_<PrmDiscountPercent>%_applied_to_<PRODUCT_CODE>"
+	
+	Parameters
+		PrmDiscountPercent is Numeric size 5 decimals 2
+			default label is untranslatable:"Discount_Percent"
+	
+	Local Fields
+		NewPrice is Numeric size 15 decimals 2
+	
+	Parameter Rules
+		PrmDiscountPercent
+			required
+				untranslatable:"Discount_Percent_is_required"
+			
+			constraint is PrmDiscountPercent > 0 and PrmDiscountPercent <= 100
+				untranslatable:"Discount_must_be_between_0_and_100_percent"
+	
+	Action Rules
+		NewPrice = UNIT_PRICE * (1 - (PrmDiscountPercent / 100))
+		UNIT_PRICE = NewPrice
+```
+
+This example demonstrates:
+- **Instance Action**: Updates record without firing field rules
+- **untranslatable labels**: Using untranslatable syntax with underscores for labels
+- **Parameter with validation**: Numeric parameter with range constraint
+- **required**: Mandatory parameter validation
+- **constraint**: Range validation (0 < percent <= 100)
+- **Local Fields**: Temporary calculation variable
+- **Percentage calculation**: Computing discount amount
+- **Direct field update**: Updating persistent field from local variable
+- **Message substitution**: Using parameter values in completion messageecuted for each instance in the set
 - **assign result to**: Capturing the result of an invoked action
 - **fill in fields from**: Copying fields from source record
 - **except**: Excluding specific fields from copy operation
