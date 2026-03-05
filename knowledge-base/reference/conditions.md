@@ -443,6 +443,37 @@ EMPLOYEE is a BusinessClass
             when SSN matches "^\\d{3}-\\d{2}-\\d{4}$"
 ```
 
+### Example: RepSetBC - Multi-Threading Conditions
+
+From the RepSetBC business class, demonstrating conditions for multi-threading control:
+
+```
+Conditions
+    CanMultiThread
+        default label is untranslatable
+        when (not BackfillDate entered)
+    
+    DisplayBackfill			
+        restricted
+        when (DataToExtract.CurrentData and HasCreateStamp and HasUpdateStamp 
+             and not MultiThreadFullReplications)
+```
+
+This example demonstrates:
+- **Feature availability**: CanMultiThread controls when multi-threading is allowed
+- **UI control**: DisplayBackfill hides backfill options when multi-threading is enabled
+- **Compound conditions**: Multiple criteria combined with `and`
+- **Negative conditions**: Using `not` to exclude scenarios
+- **Field existence checks**: Checking if fields have values
+- **Boolean field checks**: Testing boolean flags directly
+- **Derived field usage**: Using derived fields in conditions
+- **restricted**: Condition only for internal use
+
+These conditions ensure that:
+- Multi-threading is only available when no backfill date is set
+- Backfill UI is hidden when multi-threading is enabled
+- Business rules prevent conflicting operations
+
 ## Use Cases
 
 ### Validation

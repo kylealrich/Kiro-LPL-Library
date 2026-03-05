@@ -2281,3 +2281,279 @@ Actions are the primary mechanism for defining business operations in LPL. They 
 - Security controls
 
 Proper action design is critical for building robust, maintainable business applications.
+
+
+## Multi-Threading Patterns in Actions
+
+Multi-threading in LPL allows parallel processing of data to improve performance for large-scale operations. The pattern involves a coordinator action that spawns multiple worker threads, each processing a partition of the data.
+
+### Multi-Threading Architecture
+
+The multi-threading pattern consists of:
+
+1. **Configuration Fields** - Fields that control multi-threading behavior
+2. **Coordinator Action** - Spawns and manages worker threads
+3. **Worker Action** - Processes partitioned data
+4. **Locking Actions** - Prevent duplicate execution
+5. **Cleanup Actions** - Release locks and finalize processing
+
+### Example: RepSetBC - Complete Multi-Threading Pattern
+
+From the RepSetBC business class, demonstrating the complete multi-threading implementation:
+
+**Configuration Fields:**
+```
+Persistent Fields
+    MultiThreadFullReplications		is Boolean
+    MultiThreadNumThreads			is Numeric size 2
+        default label is "NumberOfThreads"
+    MultiThreadField				is a BusinessField
+        context of BusinessClass
+    MultiThreadSchemaBuilt          is Boolean
+        default label is untranslatable
+```
+
+**Coordinator Action:**
+```
+ReplicateLoop is an Instance Action
+    run in background
+    restricted
+    valid when (ReplicationSet.InProcess)
+    
+    Queue Mapping Fields
+        ReplicationSet
+        BusinessClass
+    
+    Local Fields
+        ReplLocalThreadNum	is Numeric size 2
+        LocalRequestId  is UniqueID
+        LocalBackgroundGroup is AlphaUpper size 34
+    
+    Entrance Rules
+        invoke LockReplicateLoop
+        
+    Action Rules
+        ReplLocalThreadNum = 0
+        LocalBackgroundGroup = ReplicationSet + RepSetBC
+    
+        if (MultiThreadFullReplications
+        and (not IncrementalReplication 
+        or   DisableIncrementalReplication 
+        or   not ReplicationSet.LastRefreshStamp entered))
+            invoke Create RepSetBCHistory	
+                invoked.ReplicationSet 				 = ReplicationSet
+                invoked.RepSetBC 					 = RepSetBC
+                invoked.RepSetBCHistory.Backfill 	 = 0 
+                invoked.RepSetBCHistory.HistoryStamp = ReplicationSet.AdjustedCurrentRefreshStamp 
+
+            initialize MultiThreadSchemaBuilt
+
+            while (ReplLocalThreadNum < MultiThreadNumThreads)
+                invoke Replicate in background group (LocalBackgroundGroup)
+                    invoked.PrmThreadNum = ReplLocalThreadNum
+                ReplLocalThreadNum = ReplLocalThreadNum + 1
+                
+            invoke SetFinished in background group (ReplicationSet)
+                run after background group (LocalBackgroundGroup)
+        else
+            invoke Replicate in background group (ReplicationSet)
+                invoked.PrmThreadNum = -1
+```
+
+**Worker Action:**
+```
+Replicate is an Instance Action 
+    run in background
+    restricted
+    valid when (ReplicationSet.InProcess)
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Queue Mapping Fields
+        ReplicationSet
+        BusinessClass
+    
+    Entrance Rules
+        constraint (not SynchronizeRecordCountLocked)
+            "A_'SynchronizeRecordCount'_isInProcess.ReplicationCannotRunUntilComplete."
+        invoke LockReplicateThread 
+            invoked.PrmThreadNum = PrmThreadNum
+            
+        LocalStarted = system current timestamp
+        
+    Exit Rules
+        if (ExpectedNumberOfRecordsIsValid)
+            ExpectedNumberOfRecords = ExpectedNumberOfRecords + LocalNumberCreated - LocalNumberDeleted
+        
+        invoke UnlockReplicateThread
+            invoked.PrmThreadNum = PrmThreadNum
+```
+
+**Locking Actions:**
+```
+LockReplicateLoop is an Instance Action 
+    restricted                          
+    
+    Entrance Rules
+        constraint (not ReplicateLoopLocked)
+            "ReplicateLoopIsAlreadyLocked.ThisPotentiallyIndicatesADuplicateThread."
+
+UnlockReplicateLoop is an Instance Action
+    restricted
+
+LockReplicateThread is an Instance Action 
+    restricted
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Entrance Rules
+        if (PrmThreadNum < 0)
+            LocalThreadNum = 0
+        else
+            LocalThreadNum = PrmThreadNum
+        
+        constraint (not ReplicateThreadLocked)
+            "ReplicateThread<LocalThreadNum>IsAlreadyLocked."
+    
+    Exit Rules
+        LocalThreadNum = -1
+
+UnlockReplicateThread is an Instance Action
+    restricted	
+    
+    Parameters
+        PrmThreadNum is Numeric size 2
+            default label is "ThreadNumber"
+    
+    Entrance Rules
+        if (PrmThreadNum < 0)
+            LocalThreadNum = 0
+        else
+            LocalThreadNum = PrmThreadNum
+    
+    Exit Rules
+        LocalThreadNum = -1
+
+UnlockAllReplicateThreads is an Instance Action
+    restricted	
+    
+    Parameters
+        WasIncremental is Boolean
+            default label is "Incremental"
+    
+    Local Fields
+        ReplLocalThreadNum	is Numeric size 2
+        
+    Action Rules
+        ReplLocalThreadNum = 0
+        
+        if (MultiThreadFullReplications 
+        and (DisableIncrementalReplication 
+        or not IncrementalReplication 
+        or not WasIncremental))
+            while (ReplLocalThreadNum < MultiThreadNumThreads)
+                invoke UnlockReplicateThread
+                    invoked.PrmThreadNum = ReplLocalThreadNum
+                ReplLocalThreadNum = ReplLocalThreadNum + 1
+        else
+            invoke UnlockReplicateThread
+                invoked.PrmThreadNum = 0
+```
+
+### Multi-Threading Key Concepts
+
+**Background Groups:**
+- Coordinate related background actions
+- Enable "run after" dependencies
+- Group threads for collective completion
+
+**Thread Numbering:**
+- PrmThreadNum = -1: Single-threaded mode
+- PrmThreadNum >= 0: Multi-threaded mode (0, 1, 2, ...)
+- Each thread receives unique number
+
+**Locking Strategy:**
+- Loop lock: Prevents duplicate coordinator execution
+- Thread locks: Prevent duplicate worker execution
+- Native fields: Connection-level locking
+- Automatic release: Locks released at end of work
+
+**Data Partitioning:**
+- MultiThreadField: Field used to partition data
+- Must be Numeric, Integer, Date, TimeStamp, or UniqueID
+- Each thread processes subset based on field value
+
+**Checkpoint Management:**
+- Separate checkpoints for each thread
+- Enables restart from failure point
+- Cleared when operation completes
+
+### Multi-Threading Best Practices
+
+1. **Configuration Validation**
+   - Validate MultiThreadNumThreads > 1
+   - Ensure MultiThreadField is appropriate type
+   - Check field exists and is indexed
+
+2. **Thread Coordination**
+   - Use background groups for related threads
+   - Implement proper locking mechanisms
+   - Handle single-threaded fallback
+
+3. **Error Handling**
+   - Lock threads before processing
+   - Unlock in Exit Rules (always executes)
+   - Provide force unlock for stuck locks
+
+4. **Performance**
+   - Choose appropriate thread count
+   - Balance load across threads
+   - Monitor thread execution time
+
+5. **Testing**
+   - Test single-threaded mode
+   - Test multi-threaded mode
+   - Test with various thread counts
+   - Test error scenarios
+
+### When to Use Multi-Threading
+
+**Good Use Cases:**
+- Large data replication
+- Batch processing of thousands of records
+- Independent record processing
+- CPU-intensive calculations
+- Parallel data transformations
+
+**Avoid Multi-Threading When:**
+- Small datasets (overhead > benefit)
+- Sequential dependencies between records
+- Shared resource contention
+- Complex transaction requirements
+- Debugging/troubleshooting
+
+### Multi-Threading Performance Considerations
+
+**Thread Count:**
+- Too few: Underutilizes resources
+- Too many: Overhead and contention
+- Typical: 2-8 threads for most operations
+- Consider: CPU cores, database connections, I/O
+
+**Data Partitioning:**
+- Even distribution across threads
+- Minimize cross-thread dependencies
+- Use indexed partition field
+- Consider data skew
+
+**Lock Contention:**
+- Minimize shared resource access
+- Use thread-local variables
+- Batch database operations
+- Consider lock granularity
+
+This multi-threading pattern enables efficient parallel processing of large datasets while maintaining data integrity and providing robust error handling.

@@ -372,13 +372,86 @@ Derived Fields
 ```
 
 This rule block is used to configure IDM (Infor Document Management) XML generation for purchase order documents, defining the complete structure including lines, add-on charges, comments, and sources.
-            invoked.timestamp = today
+
+### Example: RepSetBC - Columnar Validation Rule Block
+
+From the RepSetBC business class, demonstrating a rule block for columnar replication validation:
+
+```
+Rule Blocks
+    ColumnarActiveValidation
+        LocalRepSetBusClass = BusinessClass
+        if (RepSetBCOtherActiveColumnarRel exists)
+            if (not Inactive)
+                confirmation required
+                    "BusinessClassIsActiveInColumnarReplicationSet:<first RepSetBCOtherActiveColumnarRel.ReplicationSet>.ThisRecordWillBeCreatedAsInactive.Continue?"
+                Inactive = true
+            else
+                confirmation required
+                    "BusinessClassIsActiveInColumnarReplicationSet:<first RepSetBCOtherActiveColumnarRel.ReplicationSet>.Continue?"
+                    
+            LocalColumnarMessage = true
+        
+        if (RepSetBCOtherAlsoRepsToActiveColumnarRel exists)
+            if (not Inactive)
+                confirmation required
+                    "BusinessClassIsActiveInAndUsedAsReplicateToColumnarInReplicationSet:<first RepSetBCOtherAlsoRepsToActiveColumnarRel.ReplicationSet>.ThisRecordWillBeCreatedAsInactive.Continue?"
+                Inactive = true
+            else
+                confirmation required
+                    "BusinessClassIsActiveInAndUsedAsReplicateToColumnarInReplicationSet:<first RepSetBCOtherAlsoRepsToActiveColumnarRel.ReplicationSet>.Continue?"
+                    
+            LocalColumnarMessage = true	
+            
+
+        if (AlsoRepToColumnar and not ReplicationSet.ExportFormat.COLUMNAR
+        and (ReplicationSet.ReplicationDataDestination.IMS or ReplicationSet.ReplicationDataDestination.FTP 
+        or  (not ReplicationSet.IsMultiTenant and ReplicationSet.ReplicationDataDestination.Directory)
+        or  ReplicationSet.ReplicationDataDestination.ReplicationDataDestinationDataLake.Streaming 
+        or  ReplicationSet.ReplicationDataDestination.ReplicationDataDestinationDataLake.Batch))
+            confirmation required
+                "SecurityWillBeAppliedToDataBeingReplicated.ThisAlsoWillCauseSecurityToBeAppliedToColumnarData.Continue?"
+```
+
+This example demonstrates:
+- **Complex validation logic**: Multiple conditional checks for columnar replication
+- **Relation existence checks**: Using `exists` to check for related records
+- **Conditional confirmations**: Different messages based on state
+- **State modification**: Setting `Inactive = true` based on validation
+- **Local variable usage**: Using `LocalRepSetBusClass` and `LocalColumnarMessage`
+- **First relation access**: Using `first` to get specific related record
+- **Nested conditions**: Multiple levels of if/else logic
+- **Business rule enforcement**: Preventing duplicate active columnar replications
+- **User guidance**: Providing context-specific confirmation messages
+- **Multi-condition checks**: Complex boolean expressions with multiple clauses
+
+Usage pattern:
+```
+Create Rules
+    if (ReplicationSet.ExportFormat.COLUMNAR)
+        include ColumnarActiveValidation
+```
+
+This rule block ensures that only one active columnar replication exists for a business class, preventing conflicts and data inconsistencies in the replication system.
+
+### Example 6: Notification Rule Block
+
+```
+Rule Blocks
+    SEND_CHANGE_NOTIFICATION
+        send notification
+            to {RECIPIENT}
+            description is "{DESCRIPTION}"
+            detail is "{DETAIL_PREFIX}" + record.id
+            priority is {PRIORITY}
 
 // Usage:
 Update Action Rules
-    include LOG_CHANGE
-        {ACTION} = "Update"
-        {RECORD_TYPE} = "Order"
+    include SEND_CHANGE_NOTIFICATION
+        {RECIPIENT} = record.owner
+        {DESCRIPTION} = "New record created"
+        {DETAIL_PREFIX} = "Record created: "
+        {PRIORITY} = low
 ```
 
 Standard audit logging.

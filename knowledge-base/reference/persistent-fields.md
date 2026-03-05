@@ -612,6 +612,36 @@ SALESAGGREGATE is a BusinessClass
 - Document field purposes
 
 
+### Example: RepSetBC - Multi-Threading Configuration Fields
+
+From the RepSetBC business class, demonstrating multi-threading configuration fields:
+
+```
+Persistent Fields
+    MultiThreadFullReplications		is Boolean
+        default label is untranslatable
+    MultiThreadNumThreads			is Numeric size 2
+        default label is "NumberOfThreads"
+    MultiThreadField				is a BusinessField
+        context of BusinessClass
+    MultiThreadSchemaBuilt          is Boolean
+        default label is untranslatable
+```
+
+This example demonstrates:
+- **Boolean flag**: Enabling/disabling multi-threaded processing
+- **Numeric configuration**: Specifying number of threads
+- **BusinessField reference**: Field used to partition data across threads
+- **Context specification**: Field context tied to another business class
+- **Schema tracking**: Boolean flag to track schema build status
+- **untranslatable labels**: Using untranslatable for system fields
+
+Multi-threading fields are used to configure parallel processing of replication operations, where:
+- `MultiThreadFullReplications` enables the feature
+- `MultiThreadNumThreads` specifies how many threads to spawn
+- `MultiThreadField` identifies which field to use for data partitioning
+- `MultiThreadSchemaBuilt` tracks whether the schema has been initialized
+
 ### Example: Requisition - Complex Enterprise Persistent Fields
 
 From the Requisition business class, demonstrating various persistent field patterns:

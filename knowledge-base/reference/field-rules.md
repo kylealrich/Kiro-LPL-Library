@@ -542,6 +542,46 @@ REFRESH_DATA
     clear in-memory cache for PRODUCT
 ```
 
+### Example: RepSetBC - Multi-Threading Field Validation Rules
+
+From the RepSetBC business class, demonstrating field rules for multi-threading configuration:
+
+```
+Field Rules
+    MultiThreadField
+        if (MultiThreadFullReplications)
+            required
+                "MultiThreadFieldMustBeEntered"
+            constraint(MultiThreadField.RepresentationType.Numeric
+                    or MultiThreadField.RepresentationType.Integer
+                    or MultiThreadField.RepresentationType.Date
+                    or MultiThreadField.RepresentationType.TimeStamp
+                    or MultiThreadField.RepresentationType.UniqueID)
+                "MultiThreadFieldMustBeANumericOrIntegerOrDateOrTimestampType"
+                
+    MultiThreadNumThreads
+        if (MultiThreadFullReplications)
+            required
+                "MustChooseANumberOfThreads"
+            constraint(MultiThreadNumThreads > 1)
+                "NumberOfThreadsMustBeMoreThan1"
+```
+
+This example demonstrates:
+- **Conditional requirements**: Field required only when feature is enabled
+- **Type validation**: Ensuring field is appropriate type for partitioning
+- **Multiple type checks**: Using `or` to allow several valid types
+- **Range validation**: Ensuring thread count is meaningful (> 1)
+- **Compound conditions**: Checking field properties (RepresentationType)
+- **Clear error messages**: Providing specific guidance for validation failures
+- **Business rule enforcement**: Preventing invalid multi-threading configurations
+
+These field rules ensure that:
+- Multi-threading is properly configured before use
+- The partition field is an appropriate type for data distribution
+- The thread count is valid (must be at least 2 for multi-threading)
+- Users receive clear feedback when configuration is invalid
+
 ## Use Cases
 
 ### Data Validation
