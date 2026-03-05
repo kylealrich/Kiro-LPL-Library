@@ -1,0 +1,121 @@
+Product is a BusinessClass
+	owned by Inventory
+	sql name is PRODUCT
+	default label is untranslatable
+
+representative text is "<PRODUCTCODE> - <DESCRIPTION>"
+
+Ontology
+	stereotype is Document
+	symbolic key is PRODUCTCODE
+
+Persistent Fields
+	PRODUCTCODE is Alpha size 20
+		default label is untranslatable:"Product_Code"
+		text searchable
+		required
+	
+	DESCRIPTION is Alpha size 100
+		default label is untranslatable
+		text searchable
+		required
+	
+	UNITPRICE is Numeric size 15 decimals 2
+		default label is untranslatable:"Unit_Price"
+		default value is 0.00
+	
+	ACTIVE is Boolean
+		default label is untranslatable
+		default value is true
+	
+	CREATEDDATE is Date
+		default label is untranslatable:"Created_Date"
+	
+	MODIFIEDDATE is Date
+		default label is untranslatable:"Modified_Date"
+
+Field Rules
+	PRODUCTCODE
+		required
+			untranslatable:"Product_Code_is_required"
+	
+	DESCRIPTION
+		required
+			untranslatable:"Description_is_required"
+	
+	UNITPRICE
+		constraint
+			UNITPRICE >= 0
+			untranslatable:"Unit_Price_must_be_zero_or_greater"
+
+Commit Rules
+	CREATEDDATE = today if adding
+	MODIFIEDDATE = today
+
+Actions
+	Create is a Create Action
+		default label is untranslatable
+		completion message is untranslatable:"Product_<PRODUCTCODE>_created_successfully"
+		
+		Parameters
+			PrmProductCode is Alpha size 20
+				default label is untranslatable:"Product_Code"
+			
+			PrmDescription is Alpha size 100
+				default label is untranslatable
+			
+			PrmUnitPrice is Numeric size 15 decimals 2
+				default label is untranslatable:"Unit_Price"
+		
+		Parameter Rules
+			PrmProductCode
+				required
+					untranslatable:"Product_Code_is_required"
+			
+			PrmDescription
+				required
+					untranslatable:"Description_is_required"
+			
+			PrmUnitPrice
+				constraint
+					PrmUnitPrice >= 0
+					untranslatable:"Unit_Price_must_be_zero_or_greater"
+		
+		Action Rules
+			PRODUCTCODE = PrmProductCode
+			DESCRIPTION = PrmDescription
+			UNITPRICE = PrmUnitPrice
+			ACTIVE = true
+	
+	Update is an Update Action
+		default label is untranslatable
+		completion message is untranslatable:"Product_<PRODUCTCODE>_updated_successfully"
+		
+		Parameters
+			PrmDescription is Alpha size 100
+				default label is untranslatable
+			
+			PrmUnitPrice is Numeric size 15 decimals 2
+				default label is untranslatable:"Unit_Price"
+			
+			PrmActive is Boolean
+				default label is untranslatable
+		
+		Parameter Rules
+			PrmDescription
+				required
+					untranslatable:"Description_is_required"
+			
+			PrmUnitPrice
+				constraint
+					PrmUnitPrice >= 0
+					untranslatable:"Unit_Price_must_be_zero_or_greater"
+		
+		Action Rules
+			DESCRIPTION = PrmDescription
+			UNITPRICE = PrmUnitPrice
+			ACTIVE = PrmActive
+	
+	Delete is a Delete Action
+		default label is untranslatable
+		completion message is untranslatable:"Product_<PRODUCTCODE>_deleted_successfully"
